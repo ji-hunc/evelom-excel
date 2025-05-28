@@ -88,38 +88,38 @@ if uploaded_file and password:
                 for cell in row:
                     cell.alignment = Alignment(horizontal="center")
 
-            # 🎨 중복 수취인명만 같은 색으로 표시
-            receivers = [ws.cell(row=row_idx, column=1).value for row_idx in range(2, ws.max_row + 1)]
-            receiver_counts = Counter(receivers)
-
-            fill_colors = [
-                "B0C4DE",  # LightSteelBlue
-                "ADD8E6",  # LightBlue
-                "87CEEB",  # SkyBlue
-                "D3D3D3",  # LightGray
-                "C0C0C0",  # Silver
+            # 🎨 수취인명 + 전화번호를 기준으로 중복 판단 (동명이인 처리!)
+            unique_ids = [
+                f"{ws.cell(row=row_idx, column=1).value}_{ws.cell(row=row_idx, column=4).value}"
+                for row_idx in range(2, ws.max_row + 1)
             ]
+            receiver_counts = Counter(unique_ids)
+
+            # 색상 리스트
+            fill_colors = ["B0C4DE", "ADD8E6", "87CEEB", "D3D3D3", "C0C0C0"]
             color_map = {}
             color_idx = 0
 
             for row_idx in range(2, ws.max_row + 1):
                 receiver = ws.cell(row=row_idx, column=1).value
+                phone = ws.cell(row=row_idx, column=4).value
+                unique_id = f"{receiver}_{phone}"
 
-                # 중복 수취인명 행 배경색
-                if receiver_counts[receiver] > 1:
-                    if receiver not in color_map:
-                        color_map[receiver] = fill_colors[color_idx % len(fill_colors)]
+                # 중복(2번 이상)만 색칠
+                if receiver_counts[unique_id] > 1:
+                    if unique_id not in color_map:
+                        color_map[unique_id] = fill_colors[color_idx % len(fill_colors)]
                         color_idx += 1
-                    fill = PatternFill(start_color=color_map[receiver], end_color=color_map[receiver], fill_type="solid")
+                    fill = PatternFill(start_color=color_map[unique_id], end_color=color_map[unique_id], fill_type="solid")
                     for col_idx in range(1, 8):
                         ws.cell(row=row_idx, column=col_idx).fill = fill
 
-                # 수량이 2 이상인 경우, 수량(C열)만 색칠
+                # 🎨 수량이 2 이상이면 수량(C열)만 연노랑으로 색칠
                 qty_cell = ws.cell(row=row_idx, column=3)
                 try:
                     qty_value = int(qty_cell.value)
                     if qty_value >= 2:
-                        qty_fill = PatternFill(start_color="FFFF99", end_color="FFFF99", fill_type="solid")  # 연노랑
+                        qty_fill = PatternFill(start_color="FFFF99", end_color="FFFF99", fill_type="solid")
                         qty_cell.fill = qty_fill
                 except:
                     pass  # 숫자 변환 실패 시 무시
