@@ -4,7 +4,8 @@ import io
 import msoffcrypto
 import time
 from openpyxl import load_workbook
-from openpyxl.styles import Alignment
+from openpyxl.styles import Alignment, PatternFill
+from collections import Counter
 
 st.title("🔐 Excel 처리 앱")
 st.write("""
@@ -13,13 +14,8 @@ st.write("""
 3️⃣ 가공된 파일을 다운로드할 수 있어요!
 """)
 
-# 👉 파일 업로드
 uploaded_file = st.file_uploader("엑셀 파일 업로드 (.xlsx)", type=["xlsx"], accept_multiple_files=False)
-
-# 👉 비밀번호 입력
 password = st.text_input("비밀번호를 입력하세요", type="password")
-
-# 👉 진행률 표시
 progress_bar = st.progress(0)
 
 if uploaded_file and password:
@@ -66,7 +62,7 @@ if uploaded_file and password:
             with pd.ExcelWriter(output, engine="openpyxl") as writer:
                 df.to_excel(writer, index=False, sheet_name="Sheet1")
 
-            # 7️⃣ openpyxl로 열 폭 및 정렬 지정
+            # 7️⃣ openpyxl로 열 폭, 정렬 지정
             output.seek(0)
             wb = load_workbook(filename=output)
             ws = wb.active
@@ -81,6 +77,33 @@ if uploaded_file and password:
             for row in ws.iter_rows(min_row=1, max_row=ws.max_row, min_col=3, max_col=3):
                 for cell in row:
                     cell.alignment = Alignment(horizontal="center")
+
+            # 🎨 중복 수취인명만 같은 색으로 표시
+            receivers = [ws.cell(row=row_idx, column=1).value for row_idx in range(2, ws.max_row + 1)]
+            receiver_counts = Counter(receivers)
+
+            # 은은한 색상 리스트
+            fill_colors = [
+                "B0C4DE",  # LightSteelBlue
+                "ADD8E6",  # LightBlue
+                "87CEEB",  # SkyBlue
+                "D3D3D3",  # LightGray
+                "C0C0C0",  # Silver
+            ]
+
+            color_map = {}
+            color_idx = 0
+
+            for row_idx in range(2, ws.max_row + 1):
+                receiver = ws.cell(row=row_idx, column=1).value
+                # 2번 이상 등장하는 경우만 색칠
+                if receiver_counts[receiver] > 1:
+                    if receiver not in color_map:
+                        color_map[receiver] = fill_colors[color_idx % len(fill_colors)]
+                        color_idx += 1
+                    fill = PatternFill(start_color=color_map[receiver], end_color=color_map[receiver], fill_type="solid")
+                    for col_idx in range(1, 8):
+                        ws.cell(row=row_idx, column=col_idx).fill = fill
 
             # 최종 저장
             final_output = io.BytesIO()
