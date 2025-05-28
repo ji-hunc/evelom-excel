@@ -72,7 +72,7 @@ if uploaded_file and password:
             with pd.ExcelWriter(output, engine="openpyxl") as writer:
                 df.to_excel(writer, index=False, sheet_name="Sheet1")
 
-            # 7️⃣ openpyxl로 열 폭, 정렬, 중복 색칠 지정
+            # 7️⃣ openpyxl로 열 폭, 정렬, 중복 색칠, 수량 색칠
             output.seek(0)
             wb = load_workbook(filename=output)
             ws = wb.active
@@ -92,7 +92,6 @@ if uploaded_file and password:
             receivers = [ws.cell(row=row_idx, column=1).value for row_idx in range(2, ws.max_row + 1)]
             receiver_counts = Counter(receivers)
 
-            # 조금 더 진하게 보이는 색상 리스트
             fill_colors = [
                 "B0C4DE",  # LightSteelBlue
                 "ADD8E6",  # LightBlue
@@ -100,12 +99,13 @@ if uploaded_file and password:
                 "D3D3D3",  # LightGray
                 "C0C0C0",  # Silver
             ]
-
             color_map = {}
             color_idx = 0
 
             for row_idx in range(2, ws.max_row + 1):
                 receiver = ws.cell(row=row_idx, column=1).value
+
+                # 중복 수취인명 행 배경색
                 if receiver_counts[receiver] > 1:
                     if receiver not in color_map:
                         color_map[receiver] = fill_colors[color_idx % len(fill_colors)]
@@ -113,6 +113,16 @@ if uploaded_file and password:
                     fill = PatternFill(start_color=color_map[receiver], end_color=color_map[receiver], fill_type="solid")
                     for col_idx in range(1, 8):
                         ws.cell(row=row_idx, column=col_idx).fill = fill
+
+                # 수량이 2 이상인 경우, 수량(C열)만 색칠
+                qty_cell = ws.cell(row=row_idx, column=3)
+                try:
+                    qty_value = int(qty_cell.value)
+                    if qty_value >= 2:
+                        qty_fill = PatternFill(start_color="FFFF99", end_color="FFFF99", fill_type="solid")  # 연노랑
+                        qty_cell.fill = qty_fill
+                except:
+                    pass  # 숫자 변환 실패 시 무시
 
             # 최종 저장
             final_output = io.BytesIO()
