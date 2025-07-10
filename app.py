@@ -51,7 +51,7 @@ if uploaded_file:
 
             # 3. 열 너비 조정
             ws.column_dimensions['A'].width = 12
-            ws.column_dimensions['C'].width = 73
+            ws.column_dimensions['C'].width = 80
             ws.column_dimensions['D'].width = 5
             ws.column_dimensions['F'].width = 30
             ws.column_dimensions['G'].width = 30
@@ -125,7 +125,7 @@ if uploaded_file:
                 product_sales[str(product).strip()] += quantity_num
 
             # 기존 데이터 마지막 행에서 한 칸 띄운 후 출력 시작
-            summary_start_row = ws.max_row + 2
+            summary_start_row = ws.max_row + 6
             # ws.cell(row=summary_start_row - 1, column=3).value = "상품명별 총 수량"  # 제목 행
 
             for i, (product, total_qty) in enumerate(product_sales.items()):
