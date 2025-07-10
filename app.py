@@ -7,6 +7,8 @@ from openpyxl.styles import PatternFill, Alignment
 from collections import Counter
 from collections import defaultdict
 from openpyxl.styles import Border, Side
+from openpyxl.styles import Font
+
 
 
 
@@ -51,7 +53,8 @@ if uploaded_file:
             ws.column_dimensions['A'].width = 12
             ws.column_dimensions['C'].width = 73
             ws.column_dimensions['D'].width = 5
-            ws.column_dimensions['F'].width = 25
+            ws.column_dimensions['F'].width = 30
+            ws.column_dimensions['G'].width = 30
             ws.column_dimensions['H'].width = 7
             ws.column_dimensions['I'].width = 25
             ws.column_dimensions['E'].width = 25
@@ -145,6 +148,26 @@ if uploaded_file:
                     cell2 = ws.cell(row=row, column=col + 1)
                     cell2.alignment = center_align
                     ws.row_dimensions[row].height = 25
+            
+
+
+            gothic_font = Font(name='맑은 고딕', size=10)
+
+            for i, (product, total_qty) in enumerate(product_sales.items()):
+                row = summary_start_row + i
+
+                for col, val in zip([3, 4], [product, total_qty]):
+                    cell = ws.cell(row=row, column=col)
+                    cel2 = ws.cell(row=row, column=col + 1)
+                    cell.value = val
+                    cell.font = gothic_font
+                    cell.border = thin_border
+                    cell2.alignment = center_align
+
+                ws.row_dimensions[row].height = 25
+
+
+
 
             # 6. 최종 파일 저장
             output = io.BytesIO()
