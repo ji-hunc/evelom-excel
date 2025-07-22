@@ -52,13 +52,13 @@ if uploaded_file:
             # 3. 열 너비 조정
             ws.column_dimensions['A'].width = 12
             ws.column_dimensions['C'].width = 80
-            ws.column_dimensions['D'].width = 5
-            ws.column_dimensions['F'].width = 30
+            ws.column_dimensions['E'].width = 5
             ws.column_dimensions['G'].width = 30
-            ws.column_dimensions['H'].width = 7
-            ws.column_dimensions['I'].width = 25
-            ws.column_dimensions['E'].width = 25
-            ws.column_dimensions['K'].width = 80
+            ws.column_dimensions['H'].width = 30
+            ws.column_dimensions['I'].width = 7
+            ws.column_dimensions['J'].width = 25
+            ws.column_dimensions['F'].width = 25
+            ws.column_dimensions['L'].width = 80
             progress_bar.progress(30)
 
             # 4. B열(수취인명) 기준으로 빈 행 추가 및 회색으로 채우기 + 행 높이 조정
@@ -88,7 +88,7 @@ if uploaded_file:
                 if ws.cell(row=row_idx, column=2).value is None:
                     continue  # 수취인명 비어있으면 건너뜀
 
-                indices_to_check = [4, 8]  # D열, H열
+                indices_to_check = [5, 9]  # E열, I열
                 for col_idx in indices_to_check:
                     cell = ws.cell(row=row_idx, column=col_idx)
                     value = cell.value
@@ -112,7 +112,7 @@ if uploaded_file:
 
             for row_idx in range(2, ws.max_row + 1):
                 product = ws.cell(row=row_idx, column=3).value  # C열: 상품명
-                quantity = ws.cell(row=row_idx, column=4).value  # D열: 수량
+                quantity = ws.cell(row=row_idx, column=5).value  # E열: 수량
 
                 if product is None or str(product).strip() == "":
                     continue
@@ -130,7 +130,7 @@ if uploaded_file:
 
             for i, (product, total_qty) in enumerate(product_sales.items()):
                 ws.cell(row=summary_start_row + i, column=3).value = product
-                ws.cell(row=summary_start_row + i, column=4).value = total_qty
+                ws.cell(row=summary_start_row + i, column=5).value = total_qty
             
             # 테두리 추가
             thin_border = Border(
@@ -142,7 +142,7 @@ if uploaded_file:
 
             for i in range(len(product_sales)):
                 row = summary_start_row + i
-                for col in [3, 4]:  # C열, D열
+                for col in [3, 5]:  # C열, E열
                     cell = ws.cell(row=row, column=col)
                     cell.border = thin_border
                     cell2 = ws.cell(row=row, column=col + 1)
@@ -156,7 +156,7 @@ if uploaded_file:
             for i, (product, total_qty) in enumerate(product_sales.items()):
                 row = summary_start_row + i
 
-                for col, val in zip([3, 4], [product, total_qty]):
+                for col, val in zip([3, 5], [product, total_qty]):
                     cell = ws.cell(row=row, column=col)
                     cel2 = ws.cell(row=row, column=col + 1)
                     cell.value = val
