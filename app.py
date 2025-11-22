@@ -2,15 +2,8 @@ import streamlit as st
 import io
 import re
 from openpyxl import load_workbook
-from openpyxl.styles import PatternFill
-from openpyxl.styles import PatternFill, Alignment
-from collections import Counter
+from openpyxl.styles import PatternFill, Alignment, Border, Side, Font
 from collections import defaultdict
-from openpyxl.styles import Border, Side
-from openpyxl.styles import Font
-
-
-
 
 st.title("Excel 처리 앱")
 st.write("""
@@ -44,7 +37,7 @@ if uploaded_file:
             no_fill = PatternFill(fill_type=None)
             for row_idx, row in enumerate(ws.iter_rows(), start=1):
                 if row_idx == 1:
-                    continue  # 첫 번째 행은 건드리지 않음
+                    continue
                 for cell in row:
                     cell.fill = no_fill
             progress_bar.progress(20)
@@ -61,78 +54,88 @@ if uploaded_file:
             ws.column_dimensions['L'].width = 80
             progress_bar.progress(30)
 
-            # 4. B열(수취인명) 기준으로 빈 행 추가 및 회색으로 채우기 + 행 높이 조정
-            light_gray_fill = PatternFill(start_color="E0E0E0", end_color="E0E0E0", fill_type="solid")
-            max_col_to_fill = max(ws.max_column, 50)
-            if ws.max_row > 1:
-                for r in range(ws.max_row, 1, -1):
-                    current_recipient = ws.cell(row=r, column=2).value
-                    previous_recipient = ws.cell(row=r - 1, column=2).value
+            # ===== 4. 수취인 기준 그룹 만들기 =====
+            max_col = ws.max_column
+            original_max_row = ws.max_row
 
-                    if current_recipient is not None and previous_recipient is not None and current_recipient != previous_recipient:
-                        if (r - 1) > 1:
-                            ws.insert_rows(r)
+            groups = []
+            current_group = []
+            current_recipient = None
 
-                            # 👉 새로 삽입된 행의 높이 설정 (예: 30)
-                            # ws.row_dimensions[r + 1].height = 30
+            for row_idx in range(2, original_max_row + 1):
+                row_values = [
+                    ws.cell(row=row_idx, column=col_idx).value
+                    for col_idx in range(1, max_col + 1)
+                ]
+                recipient = row_values[1]  # B열 (수취인)
 
-                            for col_idx in range(1, max_col_to_fill + 1):
-                                ws.cell(row=r, column=col_idx).fill = light_gray_fill
-            progress_bar.progress(60)
-
-            # 5. D열과 H열 수량 확인 후 핑크색으로 칠하고, 가운데 정렬 적용 (1행, 빈 행 제외)
-            pink_fill = PatternFill(start_color="FFC0CB", end_color="FFC0CB", fill_type="solid")
-            center_align = Alignment(horizontal="center", vertical="center")
-
-            for row_idx in range(2, ws.max_row + 1):
-                if ws.cell(row=row_idx, column=2).value is None:
-                    continue  # 수취인명 비어있으면 건너뜀
-
-                indices_to_check = [5, 9]  # E열, I열
-                for col_idx in indices_to_check:
-                    cell = ws.cell(row=row_idx, column=col_idx)
-                    value = cell.value
-                    if value is None:
-                        continue
-
-                    # 👉 가운데 정렬 적용
-                    cell.alignment = center_align
-
-                    try:
-                        numeric_value = float(str(value).strip())
-                        if numeric_value >= 2:
-                            cell.fill = pink_fill
-                    except Exception:
-                        continue
-
-            progress_bar.progress(90)
-
-            # 6. C열(상품명)과 D열(수량)을 기준으로 판매량 합산
-            product_sales = defaultdict(float)
-
-            for row_idx in range(2, ws.max_row + 1):
-                product = ws.cell(row=row_idx, column=3).value  # C열: 상품명
-                quantity = ws.cell(row=row_idx, column=5).value  # E열: 수량
-
-                if product is None or str(product).strip() == "":
+                if recipient is None or str(recipient).strip() == "":
+                    if current_group:
+                        groups.append(current_group)
+                        current_group = []
+                        current_recipient = None
                     continue
 
-                try:
-                    quantity_num = float(str(quantity).strip()) if quantity is not None else 0
-                except Exception:
-                    quantity_num = 0
+                if current_recipient is None:
+                    current_recipient = recipient
+                elif recipient != current_recipient:
+                    groups.append(current_group)
+                    current_group = []
+                    current_recipient = recipient
 
-                product_sales[str(product).strip()] += quantity_num
+                current_group.append(row_values)
 
-            # 기존 데이터 마지막 행에서 한 칸 띄운 후 출력 시작
-            summary_start_row = ws.max_row + 6
-            # ws.cell(row=summary_start_row - 1, column=3).value = "상품명별 총 수량"  # 제목 행
+            if current_group:
+                groups.append(current_group)
 
-            for i, (product, total_qty) in enumerate(product_sales.items()):
-                ws.cell(row=summary_start_row + i, column=3).value = product
-                ws.cell(row=summary_start_row + i, column=5).value = total_qty
-            
-            # 테두리 추가
+            # ===== 그룹 내부 상품명(C열) 정렬 =====
+            group_objs = []
+
+            for g in groups:
+                sorted_rows = sorted(
+                    g,
+                    key=lambda row: str(row[2]) if row[2] is not None else ""
+                )
+
+                if sorted_rows and sorted_rows[0][2] is not None:
+                    group_key = str(sorted_rows[0][2])
+                else:
+                    group_key = ""
+
+                group_objs.append({
+                    "rows": sorted_rows,
+                    "key": group_key
+                })
+
+            # ===== 그룹 자체도 상품명 기준으로 정렬 =====
+            group_objs.sort(key=lambda g: g["key"])
+
+            # 데이터 영역 초기화
+            for row_idx in range(2, original_max_row + 1):
+                for col_idx in range(1, max_col + 1):
+                    ws.cell(row=row_idx, column=col_idx).value = None
+                    ws.cell(row=row_idx, column=col_idx).fill = no_fill
+
+            # ===== 정렬된 그룹 다시 쓰기 + 회색 구분선 =====
+            light_gray_fill = PatternFill(start_color="E0E0E0", end_color="E0E0E0", fill_type="solid")
+            max_col_to_fill = max(max_col, 50)
+
+            write_row = 2
+
+            for gi, g in enumerate(group_objs):
+                if gi > 0:
+                    for col_idx in range(1, max_col_to_fill + 1):
+                        ws.cell(row=write_row, column=col_idx).fill = light_gray_fill
+                    write_row += 1
+
+                for row_values in g["rows"]:
+                    for col_idx, value in enumerate(row_values, start=1):
+                        ws.cell(row=write_row, column=col_idx).value = value
+                    write_row += 1
+
+            progress_bar.progress(60)
+
+            # ===== 4-1. 전체 본문 border 설정 =====
             thin_border = Border(
                 left=Side(style='thin'),
                 right=Side(style='thin'),
@@ -140,36 +143,97 @@ if uploaded_file:
                 bottom=Side(style='thin')
             )
 
-            for i in range(len(product_sales)):
-                row = summary_start_row + i
-                for col in [3, 5]:  # C열, E열
-                    cell = ws.cell(row=row, column=col)
-                    cell.border = thin_border
-                    cell2 = ws.cell(row=row, column=col + 1)
-                    cell2.alignment = center_align
-                    ws.row_dimensions[row].height = 25
-            
+            for row_idx in range(2, ws.max_row + 1):
+                for col_idx in range(1, max_col + 1):
+                    ws.cell(row=row_idx, column=col_idx).border = thin_border
+
+            # ===== 4-2. Row height 구분 적용 =====
+            for row_idx in range(2, ws.max_row + 1):
+
+                # 구분선 판별 (회색 fill)
+                first_cell = ws.cell(row=row_idx, column=1)
+                fill = first_cell.fill
+
+                is_separator = (
+                    fill.patternType == "solid" and 
+                    (fill.start_color.rgb == "00E0E0E0" or fill.start_color.rgb == "FFE0E0E0")
+                )
+
+                if is_separator:
+                    ws.row_dimensions[row_idx].height = 15  # 구분선 row
+                else:
+                    ws.row_dimensions[row_idx].height = 30  # 일반 데이터 row
+
+            # ===== 4-3. 모든 셀 가운데 정렬 =====
+            center_align = Alignment(vertical="center")
+
+            for row_idx in range(1, ws.max_row + 1):
+                for col_idx in range(1, max_col + 1):
+                    cell = ws.cell(row=row_idx, column=col_idx)
+                    cell.alignment = center_align
 
 
+
+            # ===== 5. 핑크 색칠 =====
+            pink_fill = PatternFill(start_color="FFC0CB", end_color="FFC0CB", fill_type="solid")
+            center_align = Alignment(horizontal="center", vertical="center")
+
+            for row_idx in range(2, ws.max_row + 1):
+                for col_idx in [5, 9]:
+                    cell = ws.cell(row=row_idx, column=col_idx)
+                    value = cell.value
+                    if value is None:
+                        continue
+
+                    cell.alignment = center_align
+
+                    try:
+                        numeric_value = float(str(value).strip())
+                        if numeric_value >= 2:
+                            cell.fill = pink_fill
+                    except:
+                        pass
+
+            progress_bar.progress(80)
+
+            # ===== 6. 상품명별 합계 =====
+            product_sales = defaultdict(float)
+
+            for row_idx in range(2, ws.max_row + 1):
+                product = ws.cell(row=row_idx, column=3).value
+                quantity = ws.cell(row=row_idx, column=5).value
+
+                if product is None:
+                    continue
+
+                try:
+                    quantity_num = float(str(quantity).strip()) if quantity else 0
+                except:
+                    quantity_num = 0
+
+                product_sales[str(product).strip()] += quantity_num
+
+            summary_start_row = ws.max_row + 6
             gothic_font = Font(name='맑은 고딕', size=10)
 
             for i, (product, total_qty) in enumerate(product_sales.items()):
-                row = summary_start_row + i
+                row_idx = summary_start_row + i
 
-                for col, val in zip([3, 5], [product, total_qty]):
-                    cell = ws.cell(row=row, column=col)
-                    cel2 = ws.cell(row=row, column=col + 1)
-                    cell.value = val
-                    cell.font = gothic_font
-                    cell.border = thin_border
-                    cell2.alignment = center_align
+                ws.cell(row=row_idx, column=3).value = product
+                ws.cell(row=row_idx, column=3).border = thin_border
+                ws.cell(row=row_idx, column=3).font = gothic_font
 
-                ws.row_dimensions[row].height = 25
+                ws.cell(row=row_idx, column=5).value = total_qty
+                ws.cell(row=row_idx, column=5).border = thin_border
+                ws.cell(row=row_idx, column=5).font = gothic_font
 
+                ws.cell(row=row_idx, column=6).alignment = center_align
 
+                ws.row_dimensions[row_idx].height = 25
 
+            progress_bar.progress(95)
 
-            # 6. 최종 파일 저장
+            # 7. 파일 저장
             output = io.BytesIO()
             wb.save(output)
             output.seek(0)
